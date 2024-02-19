@@ -58,9 +58,30 @@ userSchema.pre("save", async function(next) {
     next();
 })
 
-// Checking password
+// Checking password (custom method injecting in schema)
 userSchema.methods.isPasswordCorrect = async function(password) {
     return await bcrypt.compare(password, this.password);
 }
+
+// Generate access token 
+userSchema.methods.generateAccessToken = async function() {
+    
+    const payload = {
+        _id: this._id,
+        email: this.email,
+        username: this.username,
+        fullName: this.fullName
+    }
+
+    const secretKey = process.env.ACCESS_TOKEN_SECRET;
+    const secretKeyExpiry = { expiresIn: process.env.ACCESS_TOKEN_EXPIRY};
+    
+    jwt.sign(payload, secretKey, secretKeyExpiry);
+}
+
+// Generate refresh token 
+userSchema.methods.generateRefreshToken = async function() {}
+ 
+
 
 export const User = mongoose.model("User", userSchema); 
