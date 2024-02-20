@@ -80,8 +80,18 @@ userSchema.methods.generateAccessToken = async function() {
 }
 
 // Generate refresh token 
-userSchema.methods.generateRefreshToken = async function() {}
- 
+userSchema.methods.generateRefreshToken = async function() {
+
+    const payload = {
+        _id: this._id
+    }
+
+    const secretKey = process.env.REFRESH_TOKEN_SECRET;
+    const secretKeyExpiry = { expiresIn: process.env.REFRESH_TOKEN_EXPIRY};
+    
+    jwt.sign(payload, secretKey, secretKeyExpiry);
+}
+
 
 
 export const User = mongoose.model("User", userSchema); 
