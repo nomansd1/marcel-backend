@@ -1,9 +1,8 @@
-class ApiResponse extends Error {
+class ApiResponse {
     constructor(
         statusCode,
         data,
         message = "Success",
-        success
     ) {
         this.statusCode = statusCode;
         this.data = data;
