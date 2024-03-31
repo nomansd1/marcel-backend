@@ -6,6 +6,25 @@ import { User } from '../models/user.model.js';
 import uploadOnCloudinary from '../utils/cloudinary.js';
 
 
+
+// Gelper function to create access and refresh token to avoid redundancy
+const generateAccessAndRefreshToken = async (userId) => {
+    try {
+
+        const user = User.findOne(userId)
+        const refreshToken = user.generateRefreshToken()
+        const accessToken = user.generateAccessToken()
+
+        user.refreshToken = refreshToken
+        await user.save({ validateBeforeSave: false })
+
+        return {accessToken, refreshToken}
+    
+    } catch (error) {
+        throw new ApiError(500, "Something went wrong while generating access and refresh token")
+    }
+} 
+
 const registerUser = asyncHandler(async (req, res) => {
     // Step 01 - get user details from frontend
     const { fullName, username, email, password} = req.body;
@@ -82,4 +101,73 @@ const registerUser = asyncHandler(async (req, res) => {
 
 })
 
-export { registerUser };
+const loginUser = asyncHandler(async (req, res) => {
+    // Step 01 - Get user credentials from frontend
+    const { email, username, password } = req.body;
+
+    // Step 02 - Check validation - not empty and the syntax matching as well
+    const schema = Joi.object({
+        username: Joi.string().alphanum().min(3).max(30).required(),
+        email: Joi.string().email().required(),
+        password: Joi.string().min(6).required()
+    });
+
+    // Validate req.body against the schema
+    const { error, value } = schema.validate(req.body);
+    if (error) {
+        throw new ApiError(400, error.details);
+    }
+
+    // Step 03 - Find the user
+    const user = await User.findOne({
+        $or: [{ username }, { email }]
+    })
+
+    if (!user) {
+        throw new ApiError(404, "User does not exist")
+    }
+
+    // Step 04 - Password Checking
+    const isPasswordValid = await user.isPasswordCorrect(password);
+
+    if (!isPasswordValid) {
+        throw new ApiError(301, "Invalid user credentials")
+    }
+
+    // Step 05 - If password matched then generate the access and refresh token
+    const { refreshToken, accessToken } = await generateAccessAndRefreshToken(user._id)
+    const loggedInUser = await Usewr.findById(user._id).select(
+        "-password -refreshToken"
+    )
+
+    // Step 06 - Send both token in secure cookies and Return response
+    // By adding these properties the cookie become readonly on frontend and can only be modify through server
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+    
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    user: loggedInUser,
+                    refreshToken,
+                    accessToken
+                },
+                "User logged in successfully"
+            )
+        )
+
+})
+
+const logoutUser = asyncHandler(async (req, res) => {
+    // Step 01 - Clear cookies
+    // Step 02 - Remove refresh token from DB 
+})
+
+export { registerUser, loginUser };
